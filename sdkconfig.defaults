@@ -1,0 +1,50 @@
+# Target ESP32-C3 chip
+CONFIG_IDF_TARGET="esp32c3"
+
+# Enable bootloader rollback (for OTA safety)
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# Set flash size to 4MB
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Use partition table with two OTA slots (large app support)
+CONFIG_PARTITION_TABLE_TWO_OTA_LARGE=y
+
+# Optimize for code size
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# Evaluate asserts even in release (NDEBUG) builds
+CONFIG_COMPILER_ASSERT_NDEBUG_EVALUATE=y
+
+# Disable some default compiler errors
+CONFIG_COMPILER_DISABLE_DEFAULT_ERRORS=y
+
+# Warn about orphan sections in linker
+CONFIG_COMPILER_ORPHAN_SECTIONS_WARNING=y
+
+# Use internal 8MHz/256 RTC clock source
+CONFIG_RTC_CLK_SRC_INT_8MD256=y
+
+# RTC clock calibration cycles
+CONFIG_RTC_CLK_CAL_CYCLES=1024
+
+# Do not use optimized misaligned access in libc
+CONFIG_LIBC_OPTIMIZED_MISALIGNED_ACCESS=n
+
+# Place FreeRTOS code in IRAM (faster, more reliable)
+CONFIG_FREERTOS_IN_IRAM=y
+
+# Allow up to 5 SNTP servers
+CONFIG_LWIP_SNTP_MAX_SERVERS=5
+
+# Keep peer certificate in mbedTLS SSL sessions
+CONFIG_MBEDTLS_SSL_KEEP_PEER_CERTIFICATE=y
+
+# Disable Diffie-Hellman-Merkle (DHM) in mbedTLS
+CONFIG_MBEDTLS_DHM_C=n
+
+# Disable SHA3 in mbedTLS
+CONFIG_MBEDTLS_SHA3_C=n
+
+# Enable termios support in VFS (for serial)
+CONFIG_VFS_SUPPORT_TERMIOS=y

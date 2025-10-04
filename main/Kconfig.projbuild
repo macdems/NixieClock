@@ -1,0 +1,40 @@
+menu "WI-FI Configuration"
+
+config WIFI_SSID
+    string "Wi-Fi SSID"
+
+config WIFI_PASSWORD
+    string "Wi-Fi Password"
+
+config WIFI_SSID_2
+    string "Fallback Wi-Fi SSID"
+
+config WIFI_PASSWORD_2
+    string "Fallback Wi-Fi Password"
+
+endmenu
+
+menu "MQTT Configuration"
+
+config BROKER_URI
+    string "MQTT Broker URI (mqtt://host:port or mqtts://)"
+
+config MQTT_USERNAME
+    string "MQTT Username"
+
+config MQTT_PASSWORD
+    string "MQTT Password"
+
+config MQTT_DISCOVERY_PREFIX
+    string "Home Assistant discovery prefix"
+    default "homeassistant"
+
+config NODE_NAMESPACE
+    string "Node namespace/prefix for topics"
+    default "nixie-clock-in-14"
+
+config NODE_ADD_SUFFIX
+    bool "Append unique suffix to node name"
+    default n
+
+endmenu

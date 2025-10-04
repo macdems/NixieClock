@@ -1,0 +1,12 @@
+/JLCPCB/
+*.code-workspace
+/.vscode/c_cpp_properties.json
+/build
+/out
+/sdkconfig.old
+/sdkconfig
+/managed_components
+*.lock
+/ssl/ca_cert.srl
+/ssl/ca_*.pem
+/ssl/server_*.pem
