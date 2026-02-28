@@ -18,7 +18,7 @@
 static const char* const TAG = "mqtt";
 
 #define RSSI_PUBLISH_INTERVAL_S 60
-#define DISCOVERY_PUBLISH_INTERVAL_S 15*60
+#define DISCOVERY_PUBLISH_INTERVAL_S 15 * 60
 
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 
@@ -217,9 +217,9 @@ static void publish_sensor_discovery(const char* obj_id,
 }
 
 static void publish_binary_sensor_discovery(const char* obj_id,
-                                         const char* name,
-                                         const char* device_class,
-                                         const char* entity_category) {
+                                            const char* name,
+                                            const char* device_class,
+                                            const char* entity_category) {
     char payload[1024];
     snprintf(_TOPIC, sizeof(_TOPIC), "%s/binary_sensor/%s/%s/config", CONFIG_MQTT_DISCOVERY_PREFIX, NODE_ID, obj_id);
     // clang-format off
@@ -255,6 +255,9 @@ static void publish_discovery_configs(void*) {
     publish_select_discovery("dots_effect", "Efekt kropek", DOTS_EFFECT_NAMES, "mdi:dots-horizontal");
     publish_select_discovery("digits_effect", "Efekt cyfr", DIGITS_EFFECT_NAMES, "mdi:numeric");
     publish_sensor_discovery("rssi", "RSSI", "dBm", "signal_strength", "diagnostic");
+
+    // Publish retained birth message to availability topic
+    mqtt_client_publish("status", "online", 1);
 }
 
 static void echo_states() {
@@ -262,8 +265,7 @@ static void echo_states() {
     mqtt_client_publish("blink_colon/state", blink_colon ? "ON" : "OFF", 1);
     mqtt_client_publish("vegas_effect/state", use_vegas ? "ON" : "OFF", 1);
     mqtt_client_publish("cathode_protection/state", cathode_protection ? "ON" : "OFF", 1);
-    mqtt_client_publish("cathode_protection_in_progress/state",
-                        cathode_protection_in_progress ? "ON" : "OFF", 1);
+    mqtt_client_publish("cathode_protection_in_progress/state", cathode_protection_in_progress ? "ON" : "OFF", 1);
     enum DotsEffect doe = current_dots_effect();
     if (doe < DOTS_EFFECT_FILLING_LEFT)
         mqtt_client_publish("dots_effect/state", DOTS_EFFECT_NAMES[doe], 1);
@@ -279,10 +281,32 @@ static void echo_states() {
 
 static void handle_incoming_command(const char* topic, int topic_len, const char* data, int data_len);
 
+esp_timer_handle_t init_periodic_timer(const char* name, esp_timer_cb_t callback, uint64_t period_s) {
+    esp_timer_handle_t timer;
+    esp_timer_create_args_t timer_args = {.callback = callback, .name = name};
+    if (esp_timer_create(&timer_args, &timer) == ESP_OK) {
+        // Convert seconds to microseconds
+        if (esp_timer_start_periodic(timer, period_s * 1000000LL) == ESP_OK) {
+            ESP_LOGD(TAG, "Started periodic timer %s (%llu s)", name, period_s);
+            return timer;
+        } else {
+            ESP_LOGW(TAG, "Failed to start timer %s", name);
+            esp_timer_delete(timer);
+            return NULL;
+        }
+    } else {
+        ESP_LOGW(TAG, "Failed to create timer %s", name);
+        return NULL;
+    }
+}
+
 static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data) {
     esp_mqtt_event_handle_t event = event_data;
 
     static bool first_connect = true;
+
+    static esp_timer_handle_t rssi_timer = NULL;
+    static esp_timer_handle_t discovery_timer = NULL;
 
     switch ((esp_mqtt_event_id_t)event_id) {
         case MQTT_EVENT_CONNECTED:
@@ -295,7 +319,6 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
             }
             ESP_LOGI(TAG, "MQTT connected");
             // Publish birth + discovery (retained) and subscribe to command topics
-            mqtt_client_publish("status", "online", 1);
             publish_discovery_configs(NULL);
 
             snprintf(_TOPIC, sizeof(_TOPIC), "%s/+/set", NODE_ID);
@@ -308,6 +331,12 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
             echo_states();
             break;
 
+            // Start periodic RSSI publisher (every 60 seconds)
+            rssi_timer = init_periodic_timer("rssi_publisher", publish_rssi, RSSI_PUBLISH_INTERVAL_S);
+
+            // Start periodic discovery publisher (every 3600 seconds)
+            discovery_timer = init_periodic_timer("discovery_publisher", publish_discovery_configs, DISCOVERY_PUBLISH_INTERVAL_S);
+
         case MQTT_EVENT_DATA:
             ESP_LOGD(TAG, "MQTT data: topic=%.*s data=%.*s", event->topic_len, event->topic, event->data_len, event->data);
             handle_incoming_command(event->topic + NODE_ID_LEN + 1, event->topic_len - NODE_ID_LEN - 1, event->data,
@@ -316,27 +345,14 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
 
         case MQTT_EVENT_DISCONNECTED:
             if (mqtt_evg_handle) xEventGroupClearBits(mqtt_evg_handle, MQTT_READY_BIT);
+            if (rssi_timer) esp_timer_delete(rssi_timer);
+            if (discovery_timer) esp_timer_delete(discovery_timer);
             ESP_LOGW(TAG, "MQTT disconnected");
             break;
 
         default: break;
     }
 }
-
-void init_periodic_timer(const char* name, esp_timer_cb_t callback, uint64_t period_s) {
-        esp_timer_handle_t timer;
-        esp_timer_create_args_t timer_args = {.callback = callback, .name = name};
-        if (esp_timer_create(&timer_args, &timer) == ESP_OK) {
-            // Convert seconds to microseconds
-            if (esp_timer_start_periodic(timer, period_s * 1000000LL) == ESP_OK) {
-                ESP_LOGD(TAG, "Started periodic timer %s (%llu s)", name, period_s);
-            } else {
-                ESP_LOGW(TAG, "Failed to start timer %s", name);
-            }
-        } else {
-            ESP_LOGW(TAG, "Failed to create timer %s", name);
-        }
-    }
 
 void init_mqtt_client() {
     // Use MAC to build stable IDs
@@ -369,12 +385,6 @@ void init_mqtt_client() {
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     ESP_ERROR_CHECK(esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL));
     ESP_ERROR_CHECK(esp_mqtt_client_start(mqtt_client));
-
-    // Start periodic RSSI publisher (every 60 seconds)
-    init_periodic_timer("rssi_publisher", publish_rssi, RSSI_PUBLISH_INTERVAL_S);
-
-    // Start periodic discovery publisher (every 3600 seconds)
-    init_periodic_timer("discovery_publisher", publish_discovery_configs, DISCOVERY_PUBLISH_INTERVAL_S);
 }
 
 #define TEST_MQTT_SWITCH(name, variable, ...)                \
