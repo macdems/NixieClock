@@ -1,7 +1,8 @@
 #ifndef NIXIE_CLOCK_MQTT_H
 #define NIXIE_CLOCK_MQTT_H
 
-#include "freertos/event_groups.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/event_groups.h>
 
 #define MQTT_READY_BIT BIT0  // EventGroup bit for MQTT connected
 

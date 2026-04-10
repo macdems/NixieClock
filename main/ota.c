@@ -26,13 +26,12 @@ static int64_t fw_total_len = -1;  // from HTTP header if known
 
 static esp_err_t http_evt_handler(esp_http_client_event_t* evt) {
     // After headers are parsed, content length becomes available (or -1 if chunked)
-    if (evt->event_id == HTTP_EVENT_ON_DATA && fw_total_len == -1) {
+     if (evt->event_id == HTTP_EVENT_ON_HEADERS_COMPLETE) {
         int64_t len = esp_http_client_get_content_length(evt->client);
         if (len > 0) {
             fw_total_len = len;
             ESP_LOGI(TAG, "Firmware total length: %lld KiB", (fw_total_len + 512) / 1024);
         } else {
-            fw_total_len = -2;
             ESP_LOGI(TAG, "Firmware total length: unknown (chunked)");
         }
     }
