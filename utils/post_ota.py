@@ -50,12 +50,14 @@ else:
     NODE_NAMESPACE = kconf.syms["NODE_NAMESPACE"].str_value
 
 MQTT_HOST, MQTT_PORT = "127.0.0.1", 1883
+MQTT_TLS = False
 if BROKER_URI:
     # Parse BROKER_URI inline (e.g., mqtt://user:pass@host:port or tcp://host:port)
-    m = re.match(r'^(?:\w+://)?(?:[^@]+@)?([^:/]+)(?::(\d+))?', BROKER_URI)
+    m = re.match(r'^(?:mqtt(?:\+tls|s)?://)?(?:[^@]+@)?([^:/]+)(?::(\d+))?', BROKER_URI)
     if m:
         MQTT_HOST = m.group(1)
-        MQTT_PORT = int(m.group(2)) if m.group(2) else 1883
+        MQTT_TLS = BROKER_URI.startswith("mqtts://") or BROKER_URI.startswith("mqtt+tls://")
+        MQTT_PORT = int(m.group(2)) if m.group(2) else 8883 if MQTT_TLS else 1883
 
 
 def detect_primary_ip():
@@ -197,7 +199,9 @@ def main():
     p.add_argument("-P", "--mqtt-port", type=int, default=MQTT_PORT, help="MQTT broker port")
     p.add_argument("-u", "--mqtt-user", default=MQTT_USERNAME, help="MQTT username")
     p.add_argument("-p", "--mqtt-pass", default=MQTT_PASSWORD, help="MQTT password")
-    p.add_argument("-s", "--mqtt-tls", action="store_true", help="Use MQTT over TLS")
+    t = p.add_mutually_exclusive_group()
+    t.add_argument("-s", "--mqtt-tls", action="store_const", const=True, default=MQTT_TLS, help="Use MQTT over TLS")
+    t.add_argument("--mqtt-no-tls", action="store_const", dest="mqtt_tls", const=False, help="Do not use MQTT over TLS")
     p.add_argument("-c", "--mqtt-ca", default=None, help="Path to MQTT CA certificate file")
     p.add_argument("-U", "--fw-base-url", default="", help="Base URL for firmware (if not serving locally)")
     p.add_argument("--bind-host", default="0.0.0.0", help="HTTPS server bind host")
