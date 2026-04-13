@@ -1,0 +1,17 @@
+(version 1)
+(rule "Anoda do strefy"
+	(condition "A.NetClass == 'NA' && B.NetName == 'GND' && B.Type == 'Zone'")
+    (constraint clearance (min 3mm))
+)
+(rule "Szerokość ścieżek prądowych"
+	(condition "A.NetClass == 'N?'")
+	(constraint track_width (opt 0.3mm))
+)
+(rule "Szerokość ścieżek zasilających"
+	(condition "A.NetClass == 'VCC'")
+	(constraint track_width (opt 0.4mm))
+)
+(rule "Szerokość anody"
+	(condition "A.NetName == '+180V'")
+	(constraint track_width (opt 0.6mm))
+)
