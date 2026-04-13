@@ -1,53 +1,81 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-H2 | ESP32-H21 | ESP32-H4 | ESP32-P4 | ESP32-S2 | ESP32-S3 | Linux |
-| ----------------- | ----- | -------- | -------- | -------- | -------- | --------- | -------- | --------- | -------- | -------- | -------- | -------- | ----- |
+# IN-14 Nixie Clock
 
-# Hello World Example
+A connected **IN-14 Nixie tube clock** combining classic display technology with modern embedded control.  
+This repository contains the complete project: **firmware**, **electrical schematic**, **PCB design**, and **case design**.
 
-Starts a FreeRTOS task to print "Hello World".
+## Overview
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+The project is built around an ESP-based controller and drives IN-14 Nixie tubes to display time with network-connected features such as:
 
-## How to use example
+- **Automatic time synchronization**
+- **MQTT integration**
+- **OTA firmware updates**
+- **Persistent settings storage**
 
-Follow detailed instructions provided specifically for this example.
+![IN-14 Nixie Clock](assets/nixie-clock.gif)
 
-Select the instructions depending on Espressif chip installed on your development board:
+## Repository Contents
 
-- [ESP32 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/index.html)
-- [ESP32-S2 Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
+- **Firmware** — ESP-IDF project for clock control, MQTT, OTA, and LEDs
+- **Schematic** — electrical design of the clock hardware
+- **PCB** — board layout and manufacturing files
+- **Case design** — enclosure files for the finished device
 
+## Firmware Features
 
-## Example folder contents
+- IN-14 time display control
+- Wi-Fi connectivity
+- SNTP time synchronization
+- MQTT status and command topics
+- Home Assistant discovery support
+- OTA firmware update over HTTPS
+- LED effects and persisted LED state
 
-The project **hello_world** contains one source file in C language [hello_world_main.c](main/hello_world_main.c). The file is located in folder [main](main).
+## Hardware
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt` files that provide set of directives and instructions describing the project's source files and targets (executable, library, or both).
+This project is designed for **IN-14 Nixie tubes** and includes the supporting electronics required for:
 
-Below is short explanation of remaining files in the project folder.
+- high-voltage tube driving
+- logic/control circuitry
+- power distribution
+- decorative or ambient LED lighting
 
+## Build
+
+Firmware is based on **ESP-IDF**.
+
+```bash
+idf.py build
+idf.py -p <PORT> flash monitor
 ```
-├── CMakeLists.txt
-├── pytest_hello_world.py      Python script used for automated testing
-├── main
-│   ├── CMakeLists.txt
-│   └── hello_world_main.c
-└── README.md                  This is the file you are currently reading
+
+Configuration can be adjusted with:
+
+```bash
+idf.py menuconfig
 ```
 
-For more information on structure and contents of ESP-IDF projects, please refer to Section [Build System](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html) of the ESP-IDF Programming Guide.
+## Project Structure
 
-## Troubleshooting
+```text
+main/               ESP-IDF application sources
+PCB/                PCB layout and fabrication files
+NixieClock.FCStd    FreeCAD case design file
+NixieClock.3mf      Case design export for 3D printing
+```
 
-* Program upload failure
+## Notes
 
-    * Hardware connection is not correct: run `idf.py -p PORT monitor`, and reboot your board to see if there are any output logs.
-    * The baud rate for downloading is too high: lower your baud rate in the `menuconfig` menu, and try again.
+Nixie clocks operate with **high voltage**. Hardware assembly, probing, and testing should be performed carefully and only with appropriate experience.
 
-## Technical support and feedback
+## License
 
-Please use the following feedback channels:
+This project is licensed under the **Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)** license.  
+See the [`LICENSE.md`](LICENSE.md) file for full license text.
 
-* For technical queries, go to the [esp32.com](https://esp32.com/) forum
-* For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-idf/issues)
+## Status
 
-We will get back to you as soon as possible.
+This repository is intended as a complete source package for building an IN-14 Nixie clock from electronics to enclosure.
+
+---
+A compact Nixie clock project with both vintage character and modern connectivity.
