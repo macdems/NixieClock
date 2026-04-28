@@ -329,13 +329,14 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
             // Immediately publish current states so HA shows correct values
             force_clock_update = true;
             echo_states();
-            break;
 
             // Start periodic RSSI publisher (every 60 seconds)
             rssi_timer = init_periodic_timer("rssi_publisher", publish_rssi, RSSI_PUBLISH_INTERVAL_S);
 
             // Start periodic discovery publisher (every 3600 seconds)
             discovery_timer = init_periodic_timer("discovery_publisher", publish_discovery_configs, DISCOVERY_PUBLISH_INTERVAL_S);
+
+            break;
 
         case MQTT_EVENT_DATA:
             ESP_LOGD(TAG, "MQTT data: topic=%.*s data=%.*s", event->topic_len, event->topic, event->data_len, event->data);
