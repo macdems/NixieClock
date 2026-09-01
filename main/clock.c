@@ -57,10 +57,10 @@ static void clock_task(void* param) {
 
         enum DigitsEffect digits_effect = current_digits_effect();
 
-        if (ti.tm_hour == 2 && ti.tm_min == 0 && ti.tm_sec == 0 && cathode_protection && !cathode_protection_in_progress &&
+        if (ti.tm_hour == CATHODE_PROTECTION_HOUR && ti.tm_min == 0 && ti.tm_sec == 0 && cathode_protection && !cathode_protection_in_progress &&
             (digits_effect == DIGITS_EFFECT_NONE || digits_effect == DIGITS_EFFECT_OFF || digits_effect == DIGITS_EFFECT_VEGAS))
             start_cathode_protection_cycle();
-        else if (ti.tm_hour == 3 && ti.tm_min == 0 && ti.tm_sec == 0 && cathode_protection_in_progress)
+        else if (ti.tm_hour == CATHODE_PROTECTION_HOUR + 1 && ti.tm_min == 0 && ti.tm_sec == 0 && cathode_protection_in_progress)
             stop_cathode_protection_cycle();
 
         if (digits_effect == DIGITS_EFFECT_NONE && (ti.tm_min != pti.tm_min || force_clock_update)) {

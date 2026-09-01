@@ -95,7 +95,7 @@ static void finish_discovery_payload(char* payload) {
     // clang-format on
 }
 
-static void publish_switch_discovery(const char* obj_id, const char* name, const char* icon) {
+static void publish_switch_discovery(const char* obj_id, const char* name, const char* icon, const char* entity_category) {
     char payload[1024];
     snprintf(_TOPIC, sizeof(_TOPIC), "%s/switch/%s/%s/config", CONFIG_MQTT_DISCOVERY_PREFIX, NODE_ID, obj_id);
     // clang-format off
@@ -112,6 +112,10 @@ static void publish_switch_discovery(const char* obj_id, const char* name, const
         name, NODE_ID, obj_id, icon
     );
     // clang-format on
+    if (entity_category != NULL) {
+        size_t len = strlen(payload);
+        snprintf(payload + len, sizeof(payload) - len, "\"entity_category\":\"%s\",", entity_category);
+    }
     finish_discovery_payload(payload);
     int msg_id;
     msg_id = esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, 0, 1, 1);
@@ -147,7 +151,6 @@ static void publish_leds_discovery(const char* obj_id, const char* name) {
     );
     // clang-format on
     finish_discovery_payload(payload);
-    esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, 0, 1, 1);
     int msg_id;
     msg_id = esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, 0, 1, 1);
     if (msg_id >= 0) {
@@ -201,11 +204,14 @@ static void publish_sensor_discovery(const char* obj_id,
         "\"unit_of_measurement\":\"%4$s\","
         "\"device_class\":\"%5$s\","
         "\"unique_id\":\"%2$s_%3$s\","
-        "\"state_class\":\"measurement\","
-        "\"entity_category\":\"%6$s\",",
-        name, NODE_ID, obj_id, unit, device_class, entity_category
+        "\"state_class\":\"measurement\",",
+        name, NODE_ID, obj_id, unit, device_class
     );
     // clang-format on
+    if (entity_category != NULL) {
+        size_t len = strlen(payload);
+        snprintf(payload + len, sizeof(payload) - len, "\"entity_category\":\"%s\",", entity_category);
+    }
     finish_discovery_payload(payload);
     int msg_id;
     msg_id = esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, 0, 1, 1);
@@ -229,11 +235,14 @@ static void publish_binary_sensor_discovery(const char* obj_id,
         "\"payload_on\":\"ON\","
         "\"payload_off\":\"OFF\","
         "\"device_class\":\"%4$s\","
-        "\"unique_id\":\"%2$s_%3$s\","
-        "\"entity_category\":\"%5$s\",",
-        name, NODE_ID, obj_id, device_class, entity_category
+        "\"unique_id\":\"%2$s_%3$s\",",
+        name, NODE_ID, obj_id, device_class
     );
     // clang-format on
+    if (entity_category != NULL) {
+        size_t len = strlen(payload);
+        snprintf(payload + len, sizeof(payload) - len, "\"entity_category\":\"%s\",", entity_category);
+    }
     finish_discovery_payload(payload);
     int msg_id;
     msg_id = esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, 0, 1, 1);
@@ -246,11 +255,11 @@ static void publish_binary_sensor_discovery(const char* obj_id,
 
 static void publish_discovery_configs(void*) {
     // Publish all discovery configs here
-    publish_switch_discovery("show_date", "Wyświetl datę", "mdi:calendar");
-    publish_switch_discovery("blink_colon", "Migający dwukropek", "mdi:clock-digital");
-    publish_switch_discovery("vegas_effect", "Efekt Vegas", "mdi:creation");
+    publish_switch_discovery("show_date", "Wyświetl datę", "mdi:calendar", NULL);
+    publish_switch_discovery("blink_colon", "Migający dwukropek", "mdi:clock-digital", "config");
+    publish_switch_discovery("vegas_effect", "Efekt Vegas", "mdi:creation", "config");
     publish_leds_discovery("leds", "Podświetlenie LED");
-    publish_switch_discovery("cathode_protection", "Ochrona katod", "mdi:shield-sun-outline");
+    publish_switch_discovery("cathode_protection", "Ochrona katod", "mdi:shield-sun-outline", "config");
     publish_binary_sensor_discovery("cathode_protection_in_progress", "Ochrona katod w toku", "running", "diagnostic");
     publish_select_discovery("dots_effect", "Efekt kropek", DOTS_EFFECT_NAMES, "mdi:dots-horizontal");
     publish_select_discovery("digits_effect", "Efekt cyfr", DIGITS_EFFECT_NAMES, "mdi:numeric");
@@ -418,8 +427,7 @@ static void handle_incoming_command(const char* topic, int topic_len, const char
 
     TEST_MQTT_SWITCH("vegas_effect", use_vegas, do_vegas = true; save_state_to_nvs(););
 
-    TEST_MQTT_SWITCH("cathode_protection", cathode_protection, save_state_to_nvs();
-                     if (!cathode_protection) stop_cathode_protection_cycle(); else start_cathode_protection_cycle(););
+    TEST_MQTT_SWITCH("cathode_protection", cathode_protection, save_state_to_nvs(); update_cathode_protection_cycle(););
 
     if (strncmp(topic, "leds/", (topic_len < 5) ? topic_len : 5) == 0 && handle_led_command(topic, topic_len, data, data_len))
         return;
