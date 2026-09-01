@@ -11,4 +11,6 @@ void init_clock();
 
 void show_date(bool show);
 
+#define CATHODE_PROTECTION_HOUR 2
+
 #endif  // CLOCK_H

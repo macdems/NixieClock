@@ -8,6 +8,8 @@
 #include "mqtt.h"
 #include "nixies.h"
 
+#include <time.h>
+
 const char* const TAG = "effects";
 
 void stop_all_effects() {
@@ -326,4 +328,20 @@ void stop_cathode_protection_cycle() {
     start_dots_effect(saved_dots_effect);
     mqtt_client_publish("digits_effect/state", DIGITS_EFFECT_NAMES[saved_digits_effect], 1);
     mqtt_client_publish("dots_effect/state", DOTS_EFFECT_NAMES[saved_dots_effect], 1);
+}
+
+void update_cathode_protection_cycle() {
+    time_t now;
+    struct tm ti;
+    time(&now);
+    localtime_r(&now, &ti);
+    enum DigitsEffect digits_effect = current_digits_effect();
+    if (ti.tm_hour == CATHODE_PROTECTION_HOUR) {
+        if (cathode_protection && !cathode_protection_in_progress &&
+            (digits_effect == DIGITS_EFFECT_NONE || digits_effect == DIGITS_EFFECT_OFF || digits_effect == DIGITS_EFFECT_VEGAS)) {
+            start_cathode_protection_cycle();
+        }
+    } else if (cathode_protection_in_progress) {
+        stop_cathode_protection_cycle();
+    }
 }

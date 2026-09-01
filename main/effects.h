@@ -38,6 +38,7 @@ extern _Atomic bool cathode_protection_in_progress;
 
 void start_cathode_protection_cycle();
 void stop_cathode_protection_cycle();
+void update_cathode_protection_cycle();
 
 
 #endif // NIXIE_CLOCK_EFFECTS_H
