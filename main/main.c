@@ -31,8 +31,6 @@
 
 #define LED_PIN GPIO_NUM_8
 
-static bool primary_wifi = true;
-
 static void connect_wifi() {
     wifi_config_t wifi_config = {
         .sta =
@@ -41,13 +39,9 @@ static void connect_wifi() {
             },
     };
 
-    if (!primary_wifi) {
-        strncpy((char*)wifi_config.sta.ssid, CONFIG_WIFI_SSID, sizeof(wifi_config.sta.ssid));
-        strncpy((char*)wifi_config.sta.password, CONFIG_WIFI_PASSWORD, sizeof(wifi_config.sta.password));
-    } else {
-        strncpy((char*)wifi_config.sta.ssid, CONFIG_WIFI_SSID_2, sizeof(wifi_config.sta.ssid));
-        strncpy((char*)wifi_config.sta.password, CONFIG_WIFI_PASSWORD_2, sizeof(wifi_config.sta.password));
-    }
+    strncpy((char*)wifi_config.sta.ssid, CONFIG_WIFI_SSID, sizeof(wifi_config.sta.ssid));
+    strncpy((char*)wifi_config.sta.password, CONFIG_WIFI_PASSWORD, sizeof(wifi_config.sta.password));
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_connect());
 }
@@ -59,7 +53,6 @@ static void on_wifi_event(void* arg, esp_event_base_t event_base, int32_t event_
             progress_boot_dots("WiFi connected");  // (4)
             return;
         case WIFI_EVENT_STA_DISCONNECTED:
-            primary_wifi = !primary_wifi;
             connect_wifi();
             return;
         default: return;
