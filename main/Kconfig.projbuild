@@ -6,12 +6,6 @@ config WIFI_SSID
 config WIFI_PASSWORD
     string "Wi-Fi Password"
 
-config WIFI_SSID_2
-    string "Fallback Wi-Fi SSID"
-
-config WIFI_PASSWORD_2
-    string "Fallback Wi-Fi Password"
-
 endmenu
 
 menu "MQTT Configuration"
