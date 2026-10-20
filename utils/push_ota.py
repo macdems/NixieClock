@@ -13,9 +13,7 @@ import hashlib
 import logging
 import os
 import re
-import runpy
 import socket
-import sys
 from urllib.parse import urlparse
 from pathlib import Path
 
@@ -24,15 +22,15 @@ try:
 except ImportError:
     trange = None  # type: ignore
 
-LOG = logging.getLogger("push_ota")
+LOG = logging.getLogger("ota")
 CHUNK_SIZE = 16 * 1024
 MAX_IMAGE_SIZE = 2 * 1024 * 1024
 HEADER_SIZE = 21
 TAG_SIZE = 16
 
 
-def read_push_config():
-    """Return OTA_PUSH_PORT, OTA_PUSH_KEY and MQTT settings from sdkconfig."""
+def read_config():
+    """Return OTA_PORT, OTA_KEY and MQTT settings from sdkconfig."""
     repo_root = Path(__file__).resolve().parents[1]
     port = 3232
     key = ""
@@ -47,10 +45,10 @@ def read_push_config():
         kconf = kconfiglib.Kconfig(str(repo_root / "main" / "Kconfig.projbuild"))
         if sdkconfig.exists():
             kconf.load_config(str(sdkconfig))
-        if "OTA_PUSH_PORT" in kconf.syms:
-            port = int(kconf.syms["OTA_PUSH_PORT"].str_value or port)
-        if "OTA_PUSH_KEY" in kconf.syms:
-            key = kconf.syms["OTA_PUSH_KEY"].str_value or ""
+        if "OTA_PORT" in kconf.syms:
+            port = int(kconf.syms["OTA_PORT"].str_value or port)
+        if "OTA_KEY" in kconf.syms:
+            key = kconf.syms["OTA_KEY"].str_value or ""
         mqtt_uri = kconf.syms["BROKER_URI"].str_value or mqtt_uri
         mqtt_user = kconf.syms["MQTT_USERNAME"].str_value or ""
         mqtt_password = kconf.syms["MQTT_PASSWORD"].str_value or ""
@@ -62,10 +60,10 @@ def read_push_config():
     if sdkconfig.exists():
         try:
             content = sdkconfig.read_text(encoding="utf-8")
-            match = re.search(r"^CONFIG_OTA_PUSH_PORT=(\d+)\s*$", content, re.MULTILINE)
+            match = re.search(r"^CONFIG_OTA_PORT=(\d+)\s*$", content, re.MULTILINE)
             if match:
                 port = int(match.group(1))
-            match = re.search(r'^CONFIG_OTA_PUSH_KEY="([^"\n]*)"\s*$', content, re.MULTILINE)
+            match = re.search(r'^CONFIG_OTA_KEY="([^"\n]*)"\s*$', content, re.MULTILINE)
             if match:
                 key = match.group(1)
             for config_name, variable in (("BROKER_URI", "mqtt_uri"), ("MQTT_USERNAME", "mqtt_user"), ("MQTT_PASSWORD", "mqtt_password"), ("NODE_NAMESPACE", "node_namespace")):
@@ -221,27 +219,30 @@ def send_push(firmware: Path, host: str, port: int, key_text: str, timeout: floa
         progress = None
 
     with socket.create_connection((host, port), timeout=timeout) as sock:
-        sock.settimeout(timeout)
-        sock.sendall(header)
-        sent = 0
-        while sent < len(ciphertext):
-            end = min(sent + CHUNK_SIZE, len(ciphertext))
-            sock.sendall(ciphertext[sent:end])
+        try:
+            sock.settimeout(timeout)
+            sock.sendall(header)
+            sent = 0
+            while sent < len(ciphertext):
+                end = min(sent + CHUNK_SIZE, len(ciphertext))
+                sock.sendall(ciphertext[sent:end])
+                if progress:
+                    progress.update(end - sent)
+                else:
+                    pct = int(sent * 100 / image_size)
+                    if pct % 10 == 0:
+                        LOG.info("Transferred %d%%", pct)
+                sent = end
+            sock.sendall(tag)
+            # We have sent the exact framed request. Half-close to make protocol end explicit,
+            # while keeping the receive side open for the ESP response.
+            sock.shutdown(socket.SHUT_WR)
+        except ConnectionResetError:
+            pass
+        finally:
             if progress:
-                progress.update(end - sent)
-            else:
-                pct = int(sent * 100 / image_size)
-                if pct % 10 == 0:
-                    LOG.info("Transferred %d%%", pct)
-            sent = end
-        sock.sendall(tag)
-        # We have sent the exact framed request. Half-close to make protocol end explicit,
-        # while keeping the receive side open for the ESP response.
-        sock.shutdown(socket.SHUT_WR)
+                progress.close()
         response = sock.makefile("rb").readline(128).decode("utf-8", errors="replace").strip()
-
-    if progress:
-        progress.close()
 
     if response == "OK rebooting":
         LOG.info("ESP accepted and authenticated the image; it is rebooting.")
@@ -252,9 +253,9 @@ def send_push(firmware: Path, host: str, port: int, key_text: str, timeout: floa
 
 
 def run_push(args):
-    configured_port, configured_key, mqtt_uri, mqtt_user, mqtt_password, node_namespace = read_push_config()
-    port = args.push_port if args.push_port is not None else configured_port
-    key_text = args.push_key or os.environ.get("NIXIE_OTA_PUSH_KEY", "") or configured_key
+    configured_port, configured_key, mqtt_uri, mqtt_user, mqtt_password, node_namespace = read_config()
+    port = args.port if args.port is not None else configured_port
+    key_text = args.key or os.environ.get("NIXIE_OTA_KEY", "") or configured_key
 
     if not args.device_host:
         broker_host, broker_port, broker_tls = mqtt_connection_settings(args.mqtt_uri or mqtt_uri)
@@ -274,60 +275,34 @@ def run_push(args):
 
 
 def main():
-    # Show a short dispatcher help unless the caller explicitly requests help for
-    # one transfer method (e.g. --method push --help).
-    if any(arg in ("-h", "--help") for arg in sys.argv[1:]) and "--method" not in sys.argv[1:] and not any(
-        arg.startswith("--method=") for arg in sys.argv[1:]
-    ):
-        print(
-            "Usage: push_ota.py [--method pull|push] [method options]\n\n"
-            "Transfer firmware using either the existing HTTPS/MQTT pull method or authenticated TCP push.\n\n"
-            "Methods:\n"
-            "  push (default)  Send the image directly to the ESP with AES-256-GCM.\n\n"
-            "  pull            Run the existing utils/post_ota.py.\n"
-            "Examples:\n"
-            "  python utils/push_ota.py --method pull --help\n"
-            "  python utils/push_ota.py --method push --bin build/NixieClock.bin  # discover IP via MQTT\n  python utils/push_ota.py --method push --device-host 192.168.30.42 --bin build/NixieClock.bin\n"
-            "  python utils/push_ota.py --method push --device-host 192.168.30.42 --push-key <64-hex-digits>\n"
-        )
-        return
-
-    # Choose the method before parsing method-specific options. Pull arguments remain
-    # parsed by post_ota.py so its existing CLI and behavior stay unchanged.
-    dispatch = argparse.ArgumentParser(add_help=False)
-    dispatch.add_argument("--method", choices=("pull", "push"), default="push")
-    dispatch_args, remaining = dispatch.parse_known_args()
-
-    if dispatch_args.method == "pull":
-        pull_script = Path(__file__).resolve().with_name("post_ota.py")
-        if not pull_script.is_file():
-            raise FileNotFoundError(f"Existing pull OTA script not found: {pull_script}")
-        sys.argv = [str(pull_script), *remaining]
-        runpy.run_path(str(pull_script), run_name="__main__")
-        return
-
-    configured_port, configured_key, mqtt_uri, mqtt_user, mqtt_password, node_namespace = read_push_config()
+    configured_port, configured_key, mqtt_uri, mqtt_user, mqtt_password, node_namespace = read_config()
     parser = argparse.ArgumentParser(
-        description="Send an ESP-IDF application image to an ESP using authenticated OTA push."
+        description="Send an ESP-IDF application image to an ESP using authenticated OTA push.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Examples:\n"
+                "  python3 utils/ota.py # discover IP via MQTT\n"
+                "  python3 utils/ota.py --bin build/NixieClock.bin \n"
+                "  python3 utils/ota.py --device 192.168.30.42 --bin build/NixieClock.bin\n"
+                "  python3 utils/ota.py --device 192.168.30.42 --key <64-hex-digits>\n"
     )
-    parser.add_argument("-d", "--build-dir", default="build", help="IDF build directory (default: build)")
-    parser.add_argument("-b", "--bin", default=None, help="Explicit path to application firmware .bin")
+    parser.add_argument("--build-dir", default="build", help="IDF build directory (default: build)")
+    parser.add_argument("--bin", default=None, help="Explicit path to application firmware .bin")
     parser.add_argument(
-        "--device-host", "--device", dest="device_host", default=None,
+        "-d", "--device-host", "--device", dest="device_host", default=None,
         help="ESP IP address or hostname (default: discover it via MQTT)",
     )
     parser.add_argument(
-        "--push-port", type=int, default=configured_port,
+        "-p", "--port", type=int, default=configured_port,
         help=f"ESP OTA push TCP port (default from sdkconfig: {configured_port})",
     )
     parser.add_argument(
-        "--push-key", default=os.environ.get("NIXIE_OTA_PUSH_KEY", "") or configured_key,
-        help="64-hex-digit shared AES-256 key (default: NIXIE_OTA_PUSH_KEY or sdkconfig)",
+        "-k", "--key", default=os.environ.get("NIXIE_OTA_KEY", "") or configured_key,
+        help="64-hex-digit shared AES-256 key (default: NIXIE_OTA_KEY or sdkconfig)",
     )
     parser.add_argument("--timeout", type=float, default=30.0, help="TCP connect/read/write timeout in seconds")
     parser.add_argument("--ip-timeout", type=float, default=20.0, help="Seconds to wait for the device IP via MQTT")
-    parser.add_argument("--node-prefix", default=node_namespace, help="MQTT node prefix used by the device")
-    parser.add_argument("--mqtt-uri", default=mqtt_uri, help="MQTT broker URI from sdkconfig (e.g. mqtts://broker:8883)")
+    parser.add_argument("-n", "--node-prefix", default=node_namespace, help="MQTT node prefix used by the device")
+    parser.add_argument("-m", "--mqtt-uri", default=mqtt_uri, help="MQTT broker URI from sdkconfig (e.g. mqtts://broker:8883)")
     parser.add_argument("--mqtt-host", default=None, help="Override MQTT broker host")
     parser.add_argument("--mqtt-port", type=int, default=None, help="Override MQTT broker port")
     parser.add_argument("--mqtt-user", default=None, help="Override MQTT username")
@@ -340,9 +315,10 @@ def main():
         "-l", "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Logging level",
     )
-    parser.add_argument("--no-color", action="store_true", help="Accepted for CLI compatibility; logs are plain text")
-    args = parser.parse_args(remaining)
+    args = parser.parse_args()
+
     logging.basicConfig(level=getattr(logging, args.log_level), format="[%(name)s] %(levelname)s: %(message)s")
+
     try:
         run_push(args)
     except (OSError, RuntimeError, ValueError) as exc:

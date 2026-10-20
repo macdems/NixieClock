@@ -469,14 +469,4 @@ static void handle_incoming_command(const char* topic, int topic_len, const char
         return;
     }
 
-    if (strncmp(topic, "firmware/set", topic_len) == 0) {
-        char* url = (char*)calloc(1, data_len + 1);
-        if (url) {
-            memcpy(url, data, data_len);
-            url[data_len] = 0;
-            ESP_LOGI(TAG, "Starting OTA from URL: %s", url);
-            xTaskCreate(ota_task, "ota_task", 8192, url, 5, NULL);
-        }
-        return;
-    }
 }
