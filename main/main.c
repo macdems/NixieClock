@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include <esp_app_desc.h>
@@ -27,9 +28,18 @@
 #include "nvs.h"
 #include "ota.h"
 
-// static const char* const TAG = "main";
+static const char* const TAG = "main";
 
 #define LED_PIN GPIO_NUM_8
+
+static volatile bool ota_push_server_started = false;
+
+static void ota_push_server_task(void* param) {
+    (void)param;
+    ota_push_server_start();
+    ota_push_server_started = false;
+    vTaskDelete(NULL);
+}
 
 static void connect_wifi() {
     wifi_config_t wifi_config = {
@@ -68,6 +78,15 @@ static void on_ip_event(void* arg, esp_event_base_t event_base, int32_t event_id
             progress_boot_dots("MQTT client initialized");  // (6)
             init_clock();
             gpio_set_level(LED_PIN, 1);
+#if CONFIG_OTA_PUSH_PORT > 0
+            if (!ota_push_server_started) {
+                ota_push_server_started = true;
+                if (xTaskCreate(ota_push_server_task, "ota_push_server", 4096, NULL, 4, NULL) != pdPASS) {
+                    ota_push_server_started = false;
+                    ESP_LOGE(TAG, "Failed to create OTA push server task");
+                }
+            }
+#endif
             return;
         default: return;
     }

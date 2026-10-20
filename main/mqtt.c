@@ -1,5 +1,6 @@
 #include <esp_log.h>
 #include <esp_mac.h>
+#include <esp_netif.h>
 #include <esp_timer.h>
 #include <esp_wifi.h>
 #include <mqtt_client.h>
@@ -69,12 +70,27 @@ int mqtt_client_publish_log(const char* topic, const char* payload, int len) {
     return esp_mqtt_client_publish(mqtt_client, _TOPIC, payload, len, 0, 0);
 }
 
+static void publish_ip_address(void) {
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    esp_netif_ip_info_t ip_info;
+    if (netif == NULL || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK || ip_info.ip.addr == 0) {
+        ESP_LOGD(TAG, "Wi-Fi station IP address is not available yet");
+        return;
+    }
+
+    char ip[16];
+    snprintf(ip, sizeof(ip), IPSTR, IP2STR(&ip_info.ip));
+    mqtt_client_publish("ip/state", ip, 1);
+}
+
 void publish_rssi(void*) {
     wifi_ap_record_t ap;
-    esp_wifi_sta_get_ap_info(&ap);
-    char buf[8];
-    snprintf(buf, sizeof(buf), "%d", ap.rssi);
-    mqtt_client_publish("rssi/state", buf, 1);
+    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d", ap.rssi);
+        mqtt_client_publish("rssi/state", buf, 1);
+    }
+    publish_ip_address();
 }
 
 static void finish_discovery_payload(char* payload) {

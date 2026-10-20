@@ -32,3 +32,19 @@ config NODE_ADD_SUFFIX
     default n
 
 endmenu
+
+menu "OTA Configuration"
+
+config OTA_PUSH_PORT
+    int "Authenticated OTA push TCP port (0 disables push)"
+    range 0 65535
+    default 3232
+
+config OTA_PUSH_KEY
+    string "OTA push AES-256 key (64 hexadecimal digits)"
+    default ""
+    help
+        Shared AES-256-GCM key, entered as exactly 64 hexadecimal digits.
+        Use a randomly generated key. Push OTA is disabled unless valid.
+
+endmenu
