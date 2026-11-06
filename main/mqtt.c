@@ -36,7 +36,7 @@ static char AVAIL_TOPIC[64];
 
 static char _TOPIC[256];
 
-const char* DOTS_EFFECT_NAMES[] = {"Brak", "Miganie", "Nieustraszony", "Wypełnienie", NULL};
+const char* DOTS_EFFECT_NAMES[] = {"Brak", "Miganie", "K.I.T.T.", "Wypełnienie", NULL};
 const char* DIGITS_EFFECT_NAMES[] = {"Zegar", "Wyłącz", "Zmieniaj razem", "Zmieniaj z opóźnieniem", "Zmieniaj losowo", NULL};
 
 extern const uint8_t lets_encrypt_cert_pem_start[] asm("_binary_letsencrypt_cert_pem_start");

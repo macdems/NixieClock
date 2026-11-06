@@ -8,5 +8,5 @@
     "IDF_TARGET": "esp32c3"
   },
   "idf.customTask": "${workspaceFolder}/utils/push_ota.py --mqtt-tls --node-prefix=nixie-clock-in-14",
-  "idf.currentSetup": "/home/maciek/.espressif/v5.5.4/esp-idf"
+  "idf.currentSetup": "${userHome}/.espressif/v6.0.1/esp-idf"
 }
